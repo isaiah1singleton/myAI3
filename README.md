@@ -1,5 +1,7 @@
 # LeaseLens
 
+**Link**: https://my-ai-3-nu.vercel.app/login
+
 LeaseLens is a renter-focused AI assistant built with Next.js. It helps users evaluate apartments, compare listings, estimate affordability, review lease text, spot risky listings, and stay organized across saved apartments, tours, and applications.
 
 This repository includes:
