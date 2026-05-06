@@ -3,8 +3,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useChat } from "@ai-sdk/react";
 import { UIMessage } from "ai";
-import { ArrowUp, Loader2, LogOut, Plus, Square } from "lucide-react";
-import Image from "next/image";
+import {
+  ArrowUp,
+  Building2,
+  Loader2,
+  LogOut,
+  Plus,
+  Square,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +30,6 @@ import {
 import { WorkflowPanel } from "@/components/apartments/workflow-panel";
 import { useAuth } from "@/components/auth/auth-provider";
 import { MessageWall } from "@/components/messages/message-wall";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -150,16 +155,51 @@ function deriveChatTitleFromText(text: string) {
   return trimmed.length > 72 ? `${trimmed.slice(0, 69)}...` : trimmed;
 }
 
-function deriveChatTitleFromMessages(messages: UIMessage[]) {
-  for (const message of messages) {
-    if (message.role !== "user") continue;
-    for (const part of message.parts) {
-      if (part.type === "text" && "text" in part && part.text.trim()) {
-        return deriveChatTitleFromText(part.text);
-      }
-    }
+async function requestGeneratedChatTitle(message: string) {
+  const response = await fetch("/api/chat-title", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message }),
+  });
+
+  const data = (await response.json().catch(() => null)) as
+    | { title?: string; error?: string }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Failed to generate chat title.");
   }
-  return "New Search";
+
+  return data?.title?.trim() || deriveChatTitleFromText(message);
+}
+
+function makeUniqueChatTitle(
+  baseTitle: string,
+  chats: ChatHistoryItem[],
+  currentChatId?: string
+) {
+  const normalizedBase = baseTitle.trim() || "New Search";
+  const existingTitles = new Set(
+    chats
+      .filter((chat) => chat.id !== currentChatId)
+      .map((chat) => chat.title.trim().toLowerCase())
+  );
+
+  if (!existingTitles.has(normalizedBase.toLowerCase())) {
+    return normalizedBase;
+  }
+
+  let counter = 2;
+  let candidate = `${normalizedBase} ${counter}`;
+
+  while (existingTitles.has(candidate.toLowerCase())) {
+    counter += 1;
+    candidate = `${normalizedBase} ${counter}`;
+  }
+
+  return candidate;
 }
 
 function sortChats(chats: ChatHistoryItem[]) {
@@ -211,6 +251,7 @@ export default function HomePage() {
   const initializedRef = useRef(false);
   const processedToolResultsRef = useRef<Set<string>>(new Set());
   const skipNextChatPersistRef = useRef(false);
+  const chatSessionsRef = useRef<ChatHistoryItem[]>([]);
 
   const {
     messages,
@@ -228,6 +269,10 @@ export default function HomePage() {
       message: "",
     },
   });
+
+  useEffect(() => {
+    chatSessionsRef.current = chatSessions;
+  }, [chatSessions]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -349,11 +394,8 @@ export default function HomePage() {
     }
 
     const timeout = window.setTimeout(async () => {
-      const title = deriveChatTitleFromMessages(messages);
-
       try {
         const updated = await updateChatSession(session.access_token, currentChatId, {
-          title,
           messages,
         });
 
@@ -647,6 +689,40 @@ export default function HomePage() {
     setDurations({});
   };
 
+  const updateGeneratedChatTitle = async (
+    chatId: string,
+    accessToken: string,
+    inquiry: string
+  ) => {
+    try {
+      const generatedTitle = await requestGeneratedChatTitle(inquiry);
+      const uniqueTitle = makeUniqueChatTitle(
+        generatedTitle,
+        chatSessionsRef.current,
+        chatId
+      );
+      const updated = await updateChatSession(accessToken, chatId, {
+        title: uniqueTitle,
+      });
+
+      setChatSessions((prev) =>
+        sortChats(
+          prev.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  title: updated.title,
+                  updatedAt: updated.updated_at,
+                }
+              : chat
+          )
+        )
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!session || !user) return;
 
@@ -657,9 +733,13 @@ export default function HomePage() {
       let nextChatId = currentChatId;
 
       if (!nextChatId) {
+        const provisionalTitle = makeUniqueChatTitle(
+          deriveChatTitleFromText(trimmed),
+          chatSessionsRef.current
+        );
         const created = await createChatSession(session.access_token, {
           user_id: user.id,
-          title: deriveChatTitleFromText(trimmed),
+          title: provisionalTitle,
           messages,
         });
 
@@ -667,6 +747,11 @@ export default function HomePage() {
         nextChatId = created.id;
         setCurrentChatId(nextChatId);
         setChatSessions((prev) => sortChats([historyItem, ...prev]));
+        void updateGeneratedChatTitle(
+          nextChatId,
+          session.access_token,
+          trimmed
+        );
       }
 
       sendMessage({ text: trimmed });
@@ -731,12 +816,9 @@ export default function HomePage() {
             </ChatHeaderBlock>
 
             <ChatHeaderBlock className="justify-center">
-              <Avatar className="size-9 ring-1 ring-primary/25">
-                <AvatarImage src="/logo.png" />
-                <AvatarFallback>
-                  <Image src="/logo.png" alt="Logo" width={36} height={36} />
-                </AvatarFallback>
-              </Avatar>
+              <div className="flex size-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/8 text-primary shadow-sm">
+                <Building2 className="size-5" />
+              </div>
               <div className="space-y-0.5 text-center">
                 <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                   Apartment workflow assistant
@@ -762,7 +844,7 @@ export default function HomePage() {
 
         <div
           className={cn(
-            "grid flex-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)_380px]",
+            "grid flex-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)_380px]",
             chatHistoryCollapsed &&
               "xl:grid-cols-[88px_minmax(0,1fr)_380px]"
           )}

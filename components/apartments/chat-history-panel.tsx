@@ -32,6 +32,15 @@ function getPreview(messages: UIMessage[]) {
   return "No preview available.";
 }
 
+function formatUpdatedAt(value: string) {
+  return new Date(value).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function getInitials(title: string) {
   const words = title.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "C";
@@ -89,7 +98,7 @@ export function ChatHistoryPanel({
           </>
         )}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 p-0">
+      <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
         <ScrollArea className={collapsed ? "h-full px-2 pb-3" : "h-full px-4 pb-4"}>
           <div className="space-y-3">
             {chats.length === 0 ? (
@@ -146,19 +155,21 @@ export function ChatHistoryPanel({
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(chat.id)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <div className="truncate text-sm font-semibold">{chat.title}</div>
-                        <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                          {getPreview(chat.messages)}
-                        </div>
-                        <div className="mt-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                          {new Date(chat.updatedAt).toLocaleString()}
-                        </div>
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(chat.id)}
+                      className="min-w-0 flex-1 pr-1 text-left"
+                    >
+                      <div className="line-clamp-2 break-words text-sm font-semibold leading-5">
+                        {chat.title}
+                      </div>
+                      <div className="mt-1 line-clamp-3 break-words text-xs leading-5 text-muted-foreground">
+                        {getPreview(chat.messages)}
+                      </div>
+                      <div className="mt-3 text-[11px] leading-4 text-muted-foreground">
+                        {formatUpdatedAt(chat.updatedAt)}
+                      </div>
+                    </button>
                       <Button
                         type="button"
                         size="icon"
