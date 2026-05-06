@@ -1,246 +1,327 @@
-# MyAI3
+# LeaseLens
 
-A customizable AI chatbot assistant built with Next.js, featuring web search capabilities, vector database integration, and content moderation. This repository provides a complete foundation for deploying your own AI assistant with minimal technical knowledge required.
+LeaseLens is a renter-focused AI assistant built with Next.js. It helps users evaluate apartments, compare listings, estimate affordability, review lease text, spot risky listings, and stay organized across saved apartments, tours, and applications.
 
-## Overview
+This repository includes:
 
-MyAI3 is an AI-powered chatbot that can:
+- a chat-based apartment assistant
+- structured AI tools for renter workflows
+- persistent user accounts with Supabase auth
+- saved chat history across sessions
+- saved apartment workflow tracking
 
-- Answer questions using advanced language models
-- Search the web for up-to-date information
-- Search a vector database (Pinecone) for stored knowledge
-- Moderate content to ensure safe interactions
-- Provide citations and sources for its responses
+## What The Assistant Does
 
-The application is designed to be easily customizable without deep technical expertise. Most changes you'll want to make can be done in just two files: `config.ts` and `prompts.ts`.
+LeaseLens is designed for apartment hunting, not general chat. The assistant can:
 
-This application is deployed on Vercel. After making changes to `config.ts` or `prompts.ts`, commit and push your changes to trigger a new deployment.
+- collect renter preferences
+- score apartment fit
+- compare multiple apartments
+- estimate affordability and upfront costs
+- flag suspicious or risky listings
+- review lease and rental documents
+- save apartments to a shortlist
+- track tours and applications
+- draft landlord and broker messages
 
-## Key Files to Customize
+The main UI is an authenticated workspace with:
 
-### `config.ts` - Application Configuration
+- a past chats sidebar
+- a central chat area
+- a workflow panel for shortlist, tours, and applications
 
-This is the **primary file** you'll edit to customize your AI assistant. Located in the root directory, it contains:
+## Tech Stack
 
-- **AI Identity**: `AI_NAME` and `OWNER_NAME` - Change these to personalize your assistant
-- **Welcome Message**: `WELCOME_MESSAGE` - The greeting users see when they first open the chat
-- **UI Text**: `CLEAR_CHAT_TEXT` - The label for the "New Chat" button
-- **Moderation Messages**: Custom messages shown when content is flagged (sexual content, harassment, hate speech, violence, self-harm, illegal activities)
-- **Model Configuration**: `MODEL` - The AI model being used (currently set to OpenAI's GPT-5-mini)
-- **Vector Database Settings**: `PINECONE_TOP_K` and `PINECONE_INDEX_NAME` - Settings for your knowledge base search
-
-**Example customization:**
-
-```typescript
-export const AI_NAME = "Your Assistant Name";
-export const OWNER_NAME = "Your Name";
-export const WELCOME_MESSAGE = `Hello! I'm ${AI_NAME}, ready to help you.`;
-```
-
-### `prompts.ts` - AI Behavior and Instructions
-
-This file controls **how your AI assistant behaves and responds**. Located in the root directory, it contains:
-
-- **Identity Prompt**: Who the AI is and who created it
-- **Tool Calling Prompt**: Instructions for when to search the web or database
-- **Tone & Style**: How the AI should communicate (friendly, helpful, educational)
-- **Guardrails**: What the AI should refuse to discuss
-- **Citation Rules**: How to cite sources in responses
-- **Course Context**: Domain-specific instructions (currently mentions course syllabus)
-
-The prompts are modular, so you can edit individual sections without affecting others. The `SYSTEM_PROMPT` combines all these sections.
-
-**Example customization:**
-
-```typescript
-export const TONE_STYLE_PROMPT = `
-- Maintain a professional, business-focused tone.
-- Use clear, concise language suitable for executives.
-- Provide actionable insights and recommendations.
-`;
-```
+- Next.js 16
+- React 19
+- TypeScript
+- AI SDK
+- OpenAI
+- Supabase Auth and PostgREST
+- Pinecone
+- Exa
+- Tailwind CSS
 
 ## Project Structure
 
 ```text
-myAI3/
-├── app/                          # Next.js application files
-│   ├── api/chat/                 # Chat API endpoint
-│   │   ├── route.ts              # Main chat handler
-│   │   └── tools/                 # AI tools (web search, vector search)
-│   ├── page.tsx                  # Main chat interface (UI)
-│   ├── parts/                    # UI components
-│   └── terms/                    # Terms of Use page
-├── components/                    # React components
-│   ├── ai-elements/              # AI-specific UI components
-│   ├── messages/                 # Message display components
-│   └── ui/                       # Reusable UI components
-├── lib/                          # Utility libraries
-│   ├── moderation.ts             # Content moderation logic
-│   ├── pinecone.ts               # Vector database integration
-│   ├── sources.ts                # Source/citation handling
-│   └── utils.ts                  # General utilities
-├── types/                        # TypeScript type definitions
-├── config.ts                     # ⭐ MAIN CONFIGURATION FILE
-├── prompts.ts                    # ⭐ AI BEHAVIOR CONFIGURATION
-└── package.json                  # Dependencies and scripts
+app/
+  api/chat/
+    route.ts                 # main chat API route
+    tools/                   # apartment and support tools
+  login/page.tsx             # login and signup UI
+  page.tsx                   # authenticated app workspace
+  parts/                     # shared page-level UI
+  terms/                     # terms page
+
+components/
+  apartments/                # shortlist, workflow, history, tours, applications
+  auth/                      # auth provider
+  messages/                  # chat message rendering
+  ui/                        # reusable UI primitives
+
+lib/
+  apartment-*.ts             # scoring, workflow, lease, affordability helpers
+  moderation.ts              # input moderation
+  pinecone.ts                # vector search integration
+  supabase/                  # auth and persistence clients
+
+types/
+  apartment.ts               # shared renter domain types
+
+supabase/
+  schema.sql                 # database schema and RLS policies
+
+config.ts                    # model and app-level config
+prompts.ts                   # system prompt and behavior rules
+env.template                 # required environment variables
 ```
 
-## Important Files Explained
+## Core Files
 
-### Core Application Files
+### `app/page.tsx`
 
-- **`app/api/chat/route.ts`**: The main API endpoint that handles chat requests. It processes messages, checks moderation, and calls the AI model with tools.
+The main authenticated workspace. It:
 
-- **`app/page.tsx`**: The main user interface. This is what users see and interact with. It handles the chat interface, message display, and user input.
+- redirects signed-out users to login
+- loads chat history from Supabase
+- loads saved apartments, tours, and applications
+- renders the main chat area
+- syncs workflow state back to Supabase
 
-- **`app/api/chat/tools/web-search.ts`**: Enables the AI to search the web using Exa API. You can modify search parameters here (currently returns 3 results).
+### `app/login/page.tsx`
 
-- **`app/api/chat/tools/search-vector-database.ts`**: Enables the AI to search your Pinecone vector database for stored knowledge.
+The login and signup screen for Supabase email/password auth.
 
-### UI Components
+### `app/api/chat/route.ts`
 
-- **`components/messages/message-wall.tsx`**: Displays the conversation history
-- **`components/messages/assistant-message.tsx`**: Renders AI responses, including tool calls and reasoning
-- **`components/messages/tool-call.tsx`**: Shows when the AI is using tools (searching web, etc.)
-- **`components/ai-elements/response.tsx`**: Formats and displays AI text responses with markdown support
+The main API route for the assistant. It:
 
-### Library Files
+- receives chat messages
+- runs moderation checks
+- sends messages to the model
+- exposes the tool set used by the apartment assistant
 
-- **`lib/moderation.ts`**: Handles content moderation using OpenAI's moderation API. Checks user messages for inappropriate content before processing.
+### `app/api/chat/tools/`
 
-- **`lib/pinecone.ts`**: Manages connections to Pinecone vector database. Handles searching your knowledge base.
+Each file in this folder defines one tool the assistant can call. Current tools cover:
 
-- **`lib/sources.ts`**: Processes search results and formats them for the AI, including citation handling.
+- apartment preference collection
+- listing ingestion
+- fit scoring
+- apartment comparison
+- affordability analysis
+- listing risk detection
+- lease review
+- shortlist actions
+- tour checklist generation
+- application planning
+- landlord message drafting
 
-### Configuration Files
+When you add or remove a tool, also update:
 
-- **`env.template`**: Template for environment variables. These need to be configured in your Vercel project settings.
+- `app/api/chat/route.ts`
+- `components/messages/tool-call.tsx`
+- `components/messages/assistant-message.tsx`
 
-- **`app/terms/page.tsx`**: Terms of Use page. Uses `OWNER_NAME` from `config.ts`. Update this file if you need to modify legal terms.
+### `components/apartments/`
 
-## Environment Setup (Vercel)
+This folder contains the renter workflow UI:
 
-Configure environment variables in your Vercel project settings (Settings → Environment Variables). Add the following:
+- `chat-history-panel.tsx`
+- `workflow-panel.tsx`
+- `shortlist-panel.tsx`
+- `tour-manager.tsx`
+- `application-tracker.tsx`
+- `dashboard-overview.tsx`
 
-- `OPENAI_API_KEY` - Required for AI model and moderation
-- `EXA_API_KEY` - Optional, for web search functionality
-- `PINECONE_API_KEY` - Optional, for vector database search
+### `lib/supabase/`
 
-**Where to get API keys:**
+This folder contains the lightweight client-side integration for:
 
-- **OpenAI**: <https://platform.openai.com/api-keys> (required)
-- **Exa**: <https://dashboard.exa.ai/> (optional)
-- **Pinecone**: <https://app.pinecone.io/> (optional)
+- signing in
+- signing up
+- refreshing sessions
+- loading saved chats
+- storing saved apartments and workflow state
 
-**Note**: Only `OPENAI_API_KEY` is strictly required. The others enable additional features.
+### `types/apartment.ts`
 
-## Customization Guide
+This is the main shared schema file for the renter assistant. It defines:
 
-### Changing the AI's Name and Identity
+- renter preferences
+- apartment listings
+- fit score results
+- affordability and risk results
+- lease review results
+- saved apartments
+- tours
+- applications
 
-1. Open `config.ts`
-2. Modify `AI_NAME` and `OWNER_NAME`
-3. Update `WELCOME_MESSAGE` if desired
-4. Commit and push changes to trigger a new Vercel deployment
+## How To Replicate The Repository
 
-### Adjusting AI Behavior
+### 1. Clone the repo
 
-1. Open `prompts.ts`
-2. Edit the relevant prompt section:
-   - `TONE_STYLE_PROMPT` - Change communication style
-   - `GUARDRAILS_PROMPT` - Modify safety rules
-   - `TOOL_CALLING_PROMPT` - Adjust when tools are used
-   - `CITATIONS_PROMPT` - Change citation format
-3. Commit and push changes to trigger a new Vercel deployment
+```bash
+git clone <your-repo-url>
+cd myAI3
+```
 
-### Customizing Moderation Messages
+### 2. Install dependencies
 
-1. Open `config.ts`
-2. Find the `MODERATION_DENIAL_MESSAGE_*` constants
-3. Update the messages to match your brand voice
-4. These messages appear when content is flagged
+```bash
+npm install
+```
 
-### Changing the AI Model
+### 3. Create your environment file
 
-1. Open `config.ts`
-2. Modify the `MODEL` export (line 4)
-3. Available models depend on your AI SDK provider
-4. Update API keys in `.env.local` if switching providers
+Copy `env.template` into `.env.local` and fill in the values.
 
-### Adding or Removing Tools
+Required variables:
 
-Tools are located in `app/api/chat/tools/`. To add a new tool:
+```env
+OPENAI_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-1. Create a new file in `app/api/chat/tools/`
-2. Import and add it to `app/api/chat/route.ts` in the `tools` object
-3. Add UI display logic in `components/messages/tool-call.tsx`
-4. See `AGENTS.md` for more technical details
+Optional but supported:
 
-## Architecture Overview
+```env
+EXA_API_KEY=
+PINECONE_API_KEY=
+FIREWORKS_API_KEY=
+```
 
-The application follows a simple request-response flow:
+### 4. Set up Supabase
 
-1. **User sends message** → `app/page.tsx` (UI)
-2. **Message sent to API** → `app/api/chat/route.ts`
-3. **Content moderation check** → `lib/moderation.ts`
-4. **AI processes with tools** → Model uses web search and/or vector search as needed
-5. **Response streamed back** → UI displays response in real-time
+Create a Supabase project.
 
-The AI can autonomously decide to:
+Then open the Supabase SQL editor and run:
 
-- Answer directly
-- Search the web for current information
-- Search your vector database for stored knowledge
-- Combine multiple sources
+- `supabase/schema.sql`
 
-All responses include citations when sources are used.
+This creates:
+
+- `public.chat_sessions`
+- `public.user_workspaces`
+
+It also adds row-level security policies so users can only access their own data.
+
+In Supabase Auth:
+
+- enable Email/Password sign-in
+
+### 5. Set up optional integrations
+
+If you want the full feature set:
+
+- add an Exa API key for web search
+- add a Pinecone API key for vector search
+- make sure the Pinecone index name matches `config.ts`
+
+The app will still run without Exa and Pinecone, but those features will not work.
+
+### 6. Start the app locally
+
+```bash
+npm run dev
+```
+
+Then open:
+
+- [http://localhost:3000](http://localhost:3000)
+
+## Typical Local Test Flow
+
+1. Sign up for a new account on `/login`
+2. Start a new apartment search
+3. Ask the assistant to evaluate or compare listings
+4. Save strong options to the shortlist
+5. Refresh the page and confirm:
+   - past chats still exist
+   - saved apartments still exist
+   - tours and applications still exist
+
+## Customization
+
+### Change the assistant identity
+
+Edit `config.ts`:
+
+- `AI_NAME`
+- `OWNER_NAME`
+- `WELCOME_MESSAGE`
+- `MODEL`
+
+### Change assistant behavior
+
+Edit `prompts.ts`.
+
+This controls:
+
+- tone
+- tool-calling behavior
+- apartment workflow guidance
+- refusal and safety behavior
+
+### Add or remove tools
+
+Follow the repository rule in `AGENTS.md`:
+
+1. create or remove a tool in `app/api/chat/tools/`
+2. register it in `app/api/chat/route.ts`
+3. update `components/messages/tool-call.tsx`
+4. update `components/messages/assistant-message.tsx`
+
+## Notes
+
+- `.env.local`, `.next/`, `node_modules/`, and `*.tsbuildinfo` should not be committed
+- `env.template` and `supabase/schema.sql` should be committed
+- the `object-tracking` directory is intentionally separate from the apartment assistant workflow
 
 ## Troubleshooting
 
-### AI not responding
+### Supabase table error
 
-- Verify `OPENAI_API_KEY` is set correctly in Vercel environment variables
-- Check browser console for error messages
-- Ensure the API key has sufficient credits/quota
-- Check Vercel deployment logs for errors
+If you see:
 
-### Web search not working
+`Could not find the table 'public.chat_sessions' in the schema cache`
 
-- Verify `EXA_API_KEY` is set in Vercel environment variables
-- Check Exa API dashboard for usage limits
-- Tool will gracefully fail if API key is missing
+run the SQL in `supabase/schema.sql`, then refresh the schema cache if needed:
 
-### Vector search not working
+```sql
+notify pgrst, 'reload schema';
+```
 
-- Verify `PINECONE_API_KEY` is set in Vercel environment variables
-- Check that `PINECONE_INDEX_NAME` in `config.ts` matches your Pinecone index
-- Ensure your Pinecone index exists and has data
+### Login works but no data loads
 
-### Deployment issues
+Check:
 
-- Check Vercel deployment logs for build errors
-- Verify all environment variables are set in Vercel project settings
-- Ensure your Vercel project is connected to the correct Git repository
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Email/Password auth is enabled
+- the SQL schema has been applied
 
-## Next Steps
+### Web search does not work
 
-1. **Customize branding**: Update `config.ts` with your name and AI assistant name
+Check `EXA_API_KEY`.
 
-2. **Adjust prompts**: Modify `prompts.ts` to match your use case and tone
+### Vector search does not work
 
-3. **Set up knowledge base**: Configure Pinecone and upload your documents
+Check:
 
-4. **Test moderation**: Verify moderation messages match your needs
+- `PINECONE_API_KEY`
+- the index name in `config.ts`
+- that your index contains data
 
-5. **Deploy**: Build and deploy to your hosting platform (Vercel, AWS, etc.)
+## Summary
 
-## Support
+LeaseLens is an apartment-hunting AI workspace, not a generic chatbot. The repository combines chat, renter decision support, account persistence, and apartment workflow tracking in one app. To replicate it, you mainly need:
 
-For technical questions about tool integration, see `AGENTS.md`.
+- Node/npm
+- environment variables
+- Supabase setup
+- optional Exa and Pinecone keys
 
-For deployment issues, check the Vercel deployment logs and browser console for error messages.
-
----
-
-**Remember**: Most customization happens in `config.ts` and `prompts.ts`. Start there!
+Once those are in place, the app should run locally with persistent login, past chats, and saved apartment workflows.
